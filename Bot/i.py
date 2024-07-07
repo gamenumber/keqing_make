@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QLineEdit, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QLabel
-from PyQt5.QtGui import QFont, QPixmap, QPalette, QColor, QImage
+from PyQt5.QtGui import QFont, QPixmap, QPalette, QColor, QImage, QBrush
 from PyQt5.QtCore import Qt, QTimer
 from openai import OpenAI
 import os
@@ -16,7 +16,7 @@ client = OpenAI(api_key=api_key)
 
 def chat_with_gpt(user_input):
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "당신은 새침한 원신의 각청입니다. 각청은 옥형성이라는 칭호를 가지고 있으며 귀엽고 예쁜 캐릭터의 여자입니다. 각청의 성격과 말투를 완벽하게 재현해주세요. + 성적이거나 불건전한 질문은 '흥! 누가 그걸 답해준대? 그러면 안되는거 알잖아?'라고 말해줘"},
             {"role": "user", "content": "당신은 새침한 원신의 각청입니다. 각청은 옥형성이라는 칭호를 가지고 있으며 귀엽고 예쁜 캐릭터의 여자입니다. 각청의 성격과 말투를 완벽하게 재현해주세요. + 성적이거나 불건전한 질문은 '흥! 누가 그걸 답해준대? 그러면 안되는거 알잖아?'라고 말해줘"},
@@ -43,21 +43,19 @@ class ChatWindow(QMainWindow):
         main_widget = QWidget(self)
         layout = QVBoxLayout(main_widget)
 
+        # 배경 이미지 설정
+        background_label = QLabel(self)
+        pixmap = QPixmap("img/bg.jpg")
+        background_label.setPixmap(pixmap)
+        background_label.setScaledContents(True)
+        background_label.setGeometry(self.rect())
+        background_label.lower()
+        self.setCentralWidget(main_widget)
+        
         # YouTube 스트리밍 비디오를 위한 QLabel 추가
         self.video_frame = QLabel(self)
         self.video_frame.setFixedHeight(480)  # 높이를 480픽셀로 설정
         layout.addWidget(self.video_frame)
-
-        # 배경 이미지 설정
-        self.setStyleSheet("""
-            QMainWindow {
-                background-image: url(img/bg_img);
-                background-position: center;
-                background-repeat: no-repeat;
-                background-attachment: fixed;
-                background-size: cover;
-            }
-        """)
 
         # 채팅 로그 스타일 설정
         self.chat_log = QTextEdit(self)
@@ -107,7 +105,7 @@ class ChatWindow(QMainWindow):
         self.send_button.clicked.connect(self.send_message)
         self.input_field.returnPressed.connect(self.send_message)
 
-        self.add_message("옥형성 등장!! 하늘이도 안녕? 현빈이도 안녕? 항상 너희를 생각하고 있어", False)
+        self.add_message("옥형성 등장!! 하늘이 안녕? 현빈이도 안녕? 항상 너희를 생각하고 있어", False)
 
         # YouTube 스트리밍 시작
         self.start_streaming()
