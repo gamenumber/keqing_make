@@ -1,53 +1,33 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTextEdit, QLineEdit, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QLabel
-from PyQt5.QtGui import QFont, QPixmap, QPalette, QColor, QImage, QBrush
-from PyQt5.QtCore import Qt, QTimer
-from openai import OpenAI
-import os
-import streamlink
-import cv2
-import numpy as np
-from Foundation import *
-from AppKit import NSSpeechSynthesizer
-import requests
+from PyQt5.QtGui import QPixmap, QImage, QTextCursor
+from PyQt5.QtCore import Qt
+import pyttsx3
 
-# OpenAI client setup
+import os
+from openai import OpenAI  # OpenAI 사용 시 필요한 라이브러리
+
+# OpenAI API 설정
 api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
 
 def chat_with_gpt(user_input):
-    response = client.chat.completions.create(
+    # OpenAI와 대화하기 위한 함수
+    response = client.Chat.Completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "당신은 새침한 원신의 각청입니다. 각청은 옥형성이라는 칭호를 가지고 있으며 귀엽고 예쁜 캐릭터의 여자입니다. 각청의 성격과 말투를 완벽하게 재현해주세요. + 성적이거나 불건전한 질문은 '흥! 누가 그걸 답해준대? 그러면 안되는거 알잖아?'라고 말해줘"},
-            {"role": "user", "content": "당신은 새침한 원신의 각청입니다. 각청은 옥형성이라는 칭호를 가지고 있으며 귀엽고 예쁜 캐릭터의 여자입니다. 각청의 성격과 말투를 완벽하게 재현해주세요. + 성적이거나 불건전한 질문은 '흥! 누가 그걸 답해준대? 그러면 안되는거 알잖아?'라고 말해줘"},
-            {"role": "assistant", "content": "옥형성 등장!! 하늘이도 안녕? 현빈이도 안녕? 항상 너희를 생각하고 있어"},
             {"role": "user", "content": user_input}
         ],
         max_tokens=500
     )
     return response.choices[0].message.content
 
-def update_vtube_studio_expression(expression):
-    vtube_api_url = "http://127.0.0.1:8001/v1/special/expressions"
-    headers = {
-        "Authorization": "Bearer YOUR_VTUBE_STUDIO_API_TOKEN",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "expression": expression
-    }
-    response = requests.post(vtube_api_url, headers=headers, json=data)
-    return response.status_code == 200
-
 class ChatWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.initTTS()
         self.initUI()
-
-    def initTTS(self):
-        self.speech = NSSpeechSynthesizer.alloc().initWithVoice_("com.apple.speech.synthesis.voice.yuna")  # 한국어 음성
+        self.initTTS()  # TTS 초기화
 
     def initUI(self):
         self.setWindowTitle('각청과의 귀여운 대화')
@@ -55,20 +35,6 @@ class ChatWindow(QMainWindow):
 
         main_widget = QWidget(self)
         layout = QVBoxLayout(main_widget)
-
-        # 배경 이미지 설정
-        background_label = QLabel(self)
-        pixmap = QPixmap("img/bgs.jpg")
-        background_label.setPixmap(pixmap)
-        background_label.setScaledContents(True)
-        background_label.setGeometry(self.rect())
-        background_label.lower()
-        self.setCentralWidget(main_widget)
-        
-        # YouTube 스트리밍 비디오를 위한 QLabel 추가
-        self.video_frame = QLabel(self)
-        self.video_frame.setFixedHeight(480)  # 높이를 480픽셀로 설정
-        layout.addWidget(self.video_frame)
 
         # 채팅 로그 스타일 설정
         self.chat_log = QTextEdit(self)
@@ -120,12 +86,16 @@ class ChatWindow(QMainWindow):
 
         self.add_message("옥형성 등장!! 하늘이 안녕? 현빈이도 안녕? 항상 너희를 생각하고 있어", False)
 
-        # YouTube 스트리밍 시작
-        self.start_streaming()
+    def initTTS(self):
+        # TTS 초기화 함수
+        self.tts_engine = pyttsx3.init()
+        self.tts_engine.setProperty('rate', 150)  # 속도 설정 (기본값은 200)
+        self.tts_engine.setProperty('volume', 0.9)  # 볼륨 설정 (기본값은 1.0)
 
     def add_message(self, message, is_user):
+        # 채팅 메시지 추가 함수
         profile_pic = "img/dog_img" if is_user else "img/keqing_img"
-        align = "right" if is_user else "left"
+        align = Qt.AlignRight if is_user else Qt.AlignLeft
         bg_color = "#FFE4E1" if is_user else "#E6E6FA"
         text_color = "#000000"
 
@@ -148,15 +118,17 @@ class ChatWindow(QMainWindow):
         self.chat_log.append(html)
         self.chat_log.verticalScrollBar().setValue(self.chat_log.verticalScrollBar().maximum())
 
+        # 각청이 대답할 때 TTS로 음성 출력
         if not is_user:
             self.speak_message(message)
 
     def speak_message(self, message):
-        self.speech.startSpeakingString_(message)
-        while self.speech.isSpeaking():
-            QApplication.processEvents()  # UI 응답성 유지
+        # 메시지를 TTS로 읽어주는 함수
+        self.tts_engine.say(message)
+        self.tts_engine.runAndWait()
 
     def send_message(self):
+        # 메시지 전송 함수
         user_input = self.input_field.text()
         if user_input.lower() == 'exit':
             self.close()
@@ -168,36 +140,10 @@ class ChatWindow(QMainWindow):
         response = chat_with_gpt(user_input)
         self.add_message(response, False)
 
-        # VTuber Studio 표정 업데이트
-        if "행복" in response:
-            update_vtube_studio_expression("Happy")
-        elif "슬픔" in response:
-            update_vtube_studio_expression("Sad")
-        elif "화남" in response:
-            update_vtube_studio_expression("Angry")
-        else:
-            update_vtube_studio_expression("Neutral")
-
-    def start_streaming(self):
-        youtube_url = "https://www.youtube.com/live/F-0nWc4dKE4?si=MfdKaQHFp_oIRn2n"
-        streams = streamlink.streams(youtube_url)
-        if streams:
-            stream_url = streams['best'].url
-            self.cap = cv2.VideoCapture(stream_url)
-            
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.update_frame)
-            self.timer.start(30)
-
-    def update_frame(self):
-        ret, frame = self.cap.read()
-        if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = frame.shape
-            bytes_per_line = ch * w
-            q_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(q_image)
-            self.video_frame.setPixmap(pixmap.scaled(self.video_frame.width(), self.video_frame.height(), Qt.KeepAspectRatio))
+    def closeEvent(self, event):
+        # 종료 시 TTS 엔진 정리
+        self.tts_engine.stop()
+        event.accept()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
